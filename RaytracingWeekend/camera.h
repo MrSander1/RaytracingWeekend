@@ -2,7 +2,7 @@
 #define CAMERA_H 
 
 #include "hittable.h"
-
+#include "material.h"
 
 class camera {
 public:
@@ -11,6 +11,7 @@ public:
 	double aspect_ratio = 1.0; // Ratio of image width over height
 	int image_width = 100; // Rendered image width in pixel count
 	int samples_per_pixel = 10; // Count of random samples for each pixel
+	int max_depth = 10; // Maximum number of ray bounces into scene
 
 	std::vector<std::uint8_t> pixels;
 
@@ -26,18 +27,21 @@ public:
 
 	void update (const hittable& world) {
 
+		std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+
 		for (int j = 0; j < image_height; j++) {
+			std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
 			for (int i = 0; i < image_width; i++) {
 				auto pixel_center = pixel00_loc + ((double)i * pixel_delta_u) + ((double)j * pixel_delta_v);
 				auto ray_direction = pixel_center - center;
 
 				ray a(center, ray_direction);
 
-				sf::Vector3 pixel_color = ray_color(a, world);
+				sf::Vector3 pixel_color(0.0,0.0,0.0);
 
 				for (int sample = 0; sample < samples_per_pixel; sample++) {
 					ray r = get_ray(i, j);
-					pixel_color += ray_color(r, world);
+					pixel_color += ray_color(r, max_depth, world);
 				}
 
 				auto r = pixel_color.x;
@@ -45,9 +49,9 @@ public:
 				auto b = pixel_color.z;
 
 				auto scale = 1.0 / samples_per_pixel;
-				r = r * scale;
-				g = g * scale;
-				b = b * scale;
+				r = sqrt(r * scale);
+				g = sqrt(g * scale);
+				b = sqrt(b * scale);
 
 				// Translate the [0,1] component values to the byte range [0,255].
 
@@ -64,6 +68,8 @@ public:
 				pixels[index + 3] = 255;  // Alpha (Full Opacity)
 			}
 		}
+
+		std::clog << "\rDone.                 \n";
 	}
 
 private:
@@ -123,11 +129,21 @@ private:
 		return sf::Vector3<double> {random_double() - 0.5, random_double() - 0.5, 0.0};
 	}
 
-	sf::Vector3<double> ray_color(const ray& r, const hittable& world) const {
+	sf::Vector3<double> ray_color(const ray& r, int depth, const hittable& world) const {
+		// If we've exceeded the ray bounce limit, no more light is gathered.
+		if (depth <= 0) {
+			return sf::Vector3<double>(0.0, 0.0, 0.0);
+		}
 
 		hit_record rec;
-		if (world.hit(r, interval(0, infinity), rec)) {
-			return 0.5 * (rec.normal + sf::Vector3<double>(1.0, 1.0, 1.0));
+
+		if (world.hit(r, interval(0.001, infinity), rec)) {
+			ray scattered;
+			sf::Vector3<double> attenuation;
+			if (rec.mat->scatter(r, rec, attenuation, scattered)) {
+				return attenuation.componentWiseMul(ray_color(scattered, depth - 1, world));
+			}
+			return sf::Vector3<double>(0.0, 0.0, 0.0);
 		}
 
 		sf::Vector3<double> unit_direction = r.direction().normalized();

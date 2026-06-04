@@ -3,10 +3,13 @@
 
 #include "rtweekend.h"
 
+class material;
+
 class hit_record {
 public: 
 	sf::Vector3<double> p;
 	sf::Vector3<double> normal;
+	shared_ptr<material> mat;
 	double t;
 	bool front_face;
 
