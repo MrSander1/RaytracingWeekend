@@ -61,10 +61,26 @@ inline sf::Vector3<double> reflect(const sf::Vector3<double>& v, const sf::Vecto
 	return v - (2.0 * v.dot(n) * n);
 }
 
+inline sf::Vector3<double> refract(const sf::Vector3<double>& uv, const sf::Vector3<double>& n, double etai_over_etat) {
+	auto cos_theta = std::fmin(-uv.dot(n), 1.0);
+	sf::Vector3<double> r_out_perp = etai_over_etat * (uv + cos_theta * n);
+	sf::Vector3<double> r_out_parallel = -std::sqrt(std::fabs(1.0 - r_out_perp.lengthSquared())) * n;
+	return r_out_perp + r_out_parallel;
+}
+
 inline bool near_zero(const sf::Vector3<double>& vec) {
 	// Return true if the vector is close to zero in all dimensions.
 	auto s = 1e-8;
 	return (std::fabs(vec.x < s) && std::fabs(vec.y < s) && std::fabs(vec.z < s));
+}
+
+inline sf::Vector3<double> random_in_unit_disk() {
+	while (true) {
+		auto p = sf::Vector3<double>(random_double(-1.0, 1.0), random_double(-1.0, 1.0), 0.0);
+		if (p.lengthSquared() < 1) {
+			return p;
+		}
+	}
 }
 
 
